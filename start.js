@@ -1,3 +1,9 @@
+// Original work Copyright (c) 2025 hostinger-bot
+// See original repository: https://github.com/hostinger-bot/tiktok-tele-bot
+//
+// Modified work Copyright (c) 2025 iuno
+// Licensed under the MIT License.
+
 // start.js
 const chalk = require('chalk'); // Untuk pewarnaan konsol
 const { logs } = require('./utils/common_utils'); // Mengimpor fungsi logs
