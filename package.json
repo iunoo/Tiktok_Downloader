@@ -1,22 +1,32 @@
 {
-  "name": "tiktok-tele-bot",
-  "version": "0.0.1",
-  "description": "Simple Telegram Bot TikTok Downloader.",
-  "main": "index.js",
+  "name": "tiktok-downloader-pro",
+  "version": "1.0.0",
+  "description": "Advanced Telegram Bot to download TikTok videos, photos, and audio with AI assistance.",
+  "main": "start.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node start.js",
+    "dev": "nodemon start.js"
   },
-  "author": "Tio",
+  "keywords": [
+    "telegram-bot",
+    "tiktok-downloader",
+    "ai-assistant",
+    "nodejs",
+    "bot"
+  ],
+  "author": "Your Name Here",
   "license": "MIT",
   "engines": {
-    "node": "18.x"
+    "node": ">=20.x"
   },
   "dependencies": {
+    "axios": "^1.7.2",
     "btch-downloader": "*",
     "chalk": "^4.1.1",
+    "dotenv": "^17.0.1",
     "express": "^4.18.2",
-    "node-telegram-bot-api": "^0.61.0"
+    "follow-redirects": "^1.15.9",
+    "node-telegram-bot-api": "^0.66.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
