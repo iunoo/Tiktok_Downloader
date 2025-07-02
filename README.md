@@ -36,7 +36,7 @@ Bot ini merupakan pengembangan dari proyek sumber terbuka, dengan fokus pada **m
 ## 🚀 Coba Sekarang!
 
 Anda bisa mencoba bot ini langsung di Telegram:  
-**[@iuno_tiktok_bot](https://t.me/iuno_tiktok_bot)**  
+**[@iuno_tiktok_bot]([https://t.me/iuno_tiktok_bot](https://t.me/iunoDownloadSocmed_bot))**  
 > *(Ganti dengan tautan bot Telegram Anda setelah deploy)*
 
 ---
