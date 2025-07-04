@@ -1,80 +1,94 @@
 // bot/handlers/callback_query_handler.js
-const { logs, getLocalizedMessage, formatRuntimeMessage } = require('../../utils/common_utils'); // Utilitas umum
-const { getUserLanguage, setUserLanguage, getConversationHistory, setConversationHistory } = require('../../data/data_store'); // Data Store
-const { MESSAGES, AI_SYSTEM_PROMPT } = require('../../config/app_config'); // Konfigurasi aplikasi
-const getStartCommandKeyboard = require('../commands/start').getMainKeyboard; // Mengimpor getMainKeyboard dari start.js
+const { logs, getLocalizedMessage } = require('../../utils/common_utils');
+const { setUserLanguage, getUserLanguage } = require('../../data/data_store');
+const { MESSAGES } = require('../../config/app_config');
+const start = require('../commands/start');
+const help = require('../commands/help');
+const runtime = require('../commands/runtime');
+const { ttdl } = require('btch-downloader');
+const axios = require('axios');
 
-// Variabel untuk waktu mulai bot, akan diatur dari bot_core.js
-let botStartTime;
-
-// Fungsi untuk mengatur waktu mulai bot
-const setBotStartTime = (time) => {
-  botStartTime = time;
-};
-
-// Handler utama untuk callback query
 module.exports = async (bot, callbackQuery) => {
   const msg = callbackQuery.message;
   const chatId = msg.chat.id;
   const data = callbackQuery.data;
-  const currentLang = getUserLanguage(chatId) || 'en'; // Dapatkan bahasa pengguna, default English
+
+  logs('info', 'Callback query received', { ChatID: chatId, Data: data.split(':')[0] });
 
   try {
-    let newText = null;
-    let newMarkup = null;
+    await bot.answerCallbackQuery(callbackQuery.id);
 
     if (data.startsWith('lang_')) {
-      const newLang = data.split('_')[1];
-      if (newLang !== currentLang) { // Hanya update jika bahasa berubah
-        setUserLanguage(chatId, newLang);
-        newText = getLocalizedMessage(newLang, 'start', MESSAGES); // Gunakan pesan start untuk perubahan bahasa
-        newMarkup = { inline_keyboard: getStartCommandKeyboard(newLang) };
-        // Perbarui prompt sistem AI dalam riwayat percakapan yang ada
-        let history = getConversationHistory(chatId);
-        if (history && history.length > 0 && history[0].role === 'system') {
-          // Perbarui prompt sistem AI dengan bahasa yang baru
-          const updatedSystemPrompt = AI_SYSTEM_PROMPT.replace(/Respond in Indonesian|Respond in English/g, `Respond in ${newLang === 'id' ? 'Indonesian' : 'English'}`);
-          history[0].content = updatedSystemPrompt;
-          setConversationHistory(chatId, history);
-        }
-        logs('info', `Language changed to ${newLang} via callback`, { ChatID: chatId });
-      }
-    } else if (data === 'runtime') {
-      if (!botStartTime) {
-        logs('error', 'Bot start time not set for runtime callback command.', { ChatID: chatId });
-        newText = getLocalizedMessage(currentLang, 'processing_error', MESSAGES);
-      } else {
-        newText = formatRuntimeMessage(currentLang, botStartTime, MESSAGES); // Menggunakan fungsi utilitas
-      }
-      newMarkup = { inline_keyboard: getStartCommandKeyboard(currentLang) }; // Tetap tampilkan keyboard utama
-      logs('info', 'Runtime requested via button', { ChatID: chatId });
-    } else if (data === 'help') {
-      newText = getLocalizedMessage(currentLang, 'help', MESSAGES);
-      newMarkup = { inline_keyboard: getStartCommandKeyboard(currentLang) }; // Tetap tampilkan keyboard utama
-      logs('info', 'Help requested via button', { ChatID: chatId });
-    }
-
-    if (newText) {
-      await bot.editMessageText(newText, {
-        chat_id: chatId,
-        message_id: msg.message_id,
-        parse_mode: 'Markdown',
-        reply_markup: newMarkup,
-      });
-    }
-
-    bot.answerCallbackQuery(callbackQuery.id); // Selalu jawab callback query
-  } catch (error) {
-    if (error.message.includes('message is not modified')) {
-      logs('warning', 'Message not modified (callback query ignored)', { ChatID: chatId, Error: error.message, Data: data });
-      bot.answerCallbackQuery(callbackQuery.id);
+      const lang = data.split('_')[1];
+      setUserLanguage(chatId, lang);
+      await bot.sendMessage(chatId, `Bahasa telah diubah ke ${lang === 'id' ? 'Indonesia' : 'English'}.`);
+      await start(bot, msg);
       return;
     }
-    logs('error', 'Callback query failed', { ChatID: chatId, Error: error.message, Data: data });
-    await bot.sendMessage(chatId, getLocalizedMessage(currentLang, 'processing_error', MESSAGES), { parse_mode: 'Markdown' });
-    bot.answerCallbackQuery(callbackQuery.id);
+
+    if (data.startsWith('download_audio:')) {
+      const tiktokUrl = data.substring('download_audio:'.length);
+      let processingMsg = null;
+      try {
+        processingMsg = await bot.sendMessage(chatId, '⏳ Memproses ulang untuk audio, mohon tunggu...');
+        
+        const tiktokData = await ttdl(tiktokUrl);
+        const audioUrl = (tiktokData.audio && typeof tiktokData.audio === 'string') ? tiktokData.audio : (Array.isArray(tiktokData.audio) && tiktokData.audio.length > 0) ? tiktokData.audio[0] : null;
+
+        if (audioUrl) {
+          const response = await axios.get(audioUrl, { responseType: 'arraybuffer' });
+          const audioBuffer = Buffer.from(response.data, 'binary');
+          
+          // --- PERUBAHAN: Membuat nama file dari judul audio ---
+          // 1. Ambil judul audio, atau gunakan nama default jika tidak ada
+          let audioTitle = tiktokData.title_audio || 'audio_iuno_in';
+          
+          // 2. Bersihkan judul dari karakter yang tidak diizinkan di nama file
+          const sanitizedFilename = audioTitle.replace(/[/\\?%*:|"<>]/g, '-') + '.mp3';
+          
+          // 3. Kirim sebagai DOKUMEN dengan nama file kustom
+          await bot.sendDocument(chatId, audioBuffer, {
+            caption: `Audio dari: ${tiktokData.title || ''}`
+          }, {
+            filename: sanitizedFilename,
+            contentType: 'audio/mpeg'
+          });
+          // --- AKHIR PERUBAHAN ---
+          
+          await bot.deleteMessage(chatId, processingMsg.message_id);
+        } else {
+          throw new Error('Audio URL not found on re-fetch.');
+        }
+
+      } catch (error) {
+        logs('error', 'Failed to download or send audio from callback', { ChatID: chatId, Error: error.message });
+        if (processingMsg) {
+          await bot.deleteMessage(chatId, processingMsg.message_id);
+        }
+        await bot.sendMessage(chatId, getLocalizedMessage(getUserLanguage(chatId), 'error_sending_audio', MESSAGES));
+      }
+      return;
+    }
+
+    switch (data) {
+      case 'start':
+        await start(bot, msg);
+        break;
+      case 'help':
+        await help(bot, msg);
+        break;
+      case 'runtime':
+        await runtime(bot, msg);
+        break;
+      default:
+        await bot.sendMessage(chatId, 'Perintah tidak dikenal.');
+        break;
+    }
+  } catch (error) {
+    logs('error', 'Callback query handling failed', {
+      ChatID: chatId,
+      Data: data,
+      Error: error.message,
+    });
   }
 };
-
-// Mengekspor fungsi setBotStartTime agar bisa dipanggil dari bot_core.js
-module.exports.setBotStartTime = setBotStartTime;

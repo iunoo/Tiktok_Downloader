@@ -25,11 +25,7 @@ function startTelegramBot() {
 
   // Set waktu mulai bot di command handlers yang memerlukannya
   runtimeCommand.setBotStartTime(startTime);
-  callbackQueryHandler.setBotStartTime(startTime);
-
-  // Banner saat bot dinyalakan (bisa dipindahkan ke start.js jika ingin lebih global)
-  // logs('info', 'TikTok Downloader Bot with Enhanced AI Assistant');
-  // logs('info', '========================================');
+  // callbackQueryHandler.setBotStartTime(startTime); // INI BARIS YANG MENYEBABKAN ERROR SEBELUMNYA - SUDAH DINONAKTIFKAN
 
   logs('info', 'Bot started polling for updates.', { Token: BOT_TOKEN ? BOT_TOKEN.slice(0, 10) + '...' : 'Not Set' });
 
@@ -47,9 +43,7 @@ function startTelegramBot() {
   // 2. Callback Query (Tombol Inline)
   bot.on('callback_query', (query) => callbackQueryHandler(bot, query)); // Delegasikan ke callback_query_handler.js
 
-  // 3. Perintah Khusus (di-handle oleh bot.onText, yang akan memicu message handler juga)
-  // Walaupun message_handler juga akan memprosesnya, onText ini memastikan command spesifik
-  // langsung mengarah ke handler yang dituju.
+  // 3. Perintah Khusus
   bot.onText(/^\/start$/, (msg) => startCommand(bot, msg));
   bot.onText(/^\/help$/, (msg) => helpCommand(bot, msg));
   bot.onText(/^\/runtime$/, (msg) => runtimeCommand(bot, msg));

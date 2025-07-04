@@ -1,122 +1,54 @@
 // bot/plugins/tiktok_video.js
-const { sleep, logs, getLocalizedMessage } = require('../../utils/common_utils');
-const { MESSAGES } = require('../../config/app_config');
-const axios = require('axios');
-const https = require('follow-redirects').https;
-const path = require('path');
-const { URL } = require('url');
-const fs = require('fs'); // Diperlukan untuk operasi file
-const os = require('os'); // Diperlukan untuk os.tmpdir()
+const { getLocalizedMessage } = require('../../utils/common_utils');
+const { MESSAGES, SUPPORT_TELEGRAM_URL } = require('../../config/app_config');
 
-async function tiktok_video(bot, msg, data, userLang) {
-  const From = msg.chat.id;
-  const { title, title_audio, video, audio } = data;
+module.exports = async (bot, msg, data, lang) => {
+  const chatId = msg.chat.id;
+  const originalUrl = msg.text; // URL TikTok asli dari pengguna
 
-  const caption = `Title: ${title || 'N/A'}\nAudio: ${title_audio || 'N/A'}`;
+  const videoUrl = (data.video && typeof data.video[0] === 'string') ? data.video[0] : null;
+  const audioUrl = (data.audio && typeof data.audio === 'string') ? data.audio : (Array.isArray(data.audio) && data.audio.length > 0) ? data.audio[0] : null;
+
+  if (!videoUrl) {
+    return bot.sendMessage(chatId, getLocalizedMessage(lang, 'no_video_url_found', MESSAGES), { parse_mode: 'Markdown' });
+  }
+
+  let videoTitle = data.title || 'Tidak tersedia';
+  let audioTitle = data.title_audio || 'Tidak tersedia';
+  if (videoTitle.length > 400) videoTitle = videoTitle.substring(0, 400) + '...';
+  if (audioTitle.length > 400) audioTitle = audioTitle.substring(0, 400) + '...';
+
+  const captionText = [`Judul : ${videoTitle}`, `Audio : ${audioTitle}`].join('\n');
+  const successMessage = '✅ Video berhasil diunduh!';
+  const finalCaption = `${captionText}\n\n${successMessage}`;
+
+  const inlineKeyboard = [];
+  const row1 = [];
+
+  row1.push({ text: '🔗 URL Video', url: videoUrl });
+
+  // --- PERUBAHAN STRATEGI CALLBACK ---
+  if (audioUrl) {
+    // Menyimpan URL TikTok asli, bukan URL audio yang panjang
+    row1.push({ text: '🎧 Download Audio', callback_data: `download_audio:${originalUrl}` });
+  }
+  // --- AKHIR PERUBAHAN ---
+
+  if (row1.length > 0) {
+    inlineKeyboard.push(row1);
+  }
+
+  inlineKeyboard.push([{ text: '❤️ Support iuno.in', url: SUPPORT_TELEGRAM_URL }]);
 
   try {
-    if (video && video.length > 0 && video[0]) {
-      logs('info', 'Sending TikTok video...', { ChatID: From, VideoURL: video[0].slice(0, 50) + '...' });
-      await bot.sendVideo(From, video[0], {
-        caption: caption,
-        reply_markup: {
-          inline_keyboard: [[{ text: '🎥 URL Video', url: video[0] }]]
-        }
-      });
-      logs('success', 'TikTok video sent', { ChatID: From });
-      await sleep(3000);
-    } else {
-      logs('warning', 'No video URL found for TikTok video.', { ChatID: From });
-      await bot.sendMessage(From, getLocalizedMessage(userLang, 'no_video_url_found', MESSAGES), { parse_mode: 'Markdown' });
-      return;
-    }
-
-    if (audio && audio.length > 0 && audio[0]) {
-      const audioUrl = audio[0];
-      let filename = 'tiktok_audio_default.mp3'; // Default fallback yang lebih unik
-      let tempFilePath = '';
-
-      try {
-        const parsedUrl = new URL(audioUrl);
-        const pathSegments = parsedUrl.pathname.split('/');
-        const lastSegment = pathSegments[pathSegments.length - 1];
-
-        const idMatch = lastSegment.match(/^(\d+)\.mp3$/);
-        if (idMatch && idMatch[1]) {
-          filename = `${idMatch[1]}.mp3`;
-        } else {
-          const baseName = path.basename(parsedUrl.pathname);
-          if (baseName && baseName !== 'music' && baseName !== 'video' && baseName !== 'data' && baseName.endsWith('.mp3')) {
-            filename = baseName;
-          } else {
-            const numberInSegment = lastSegment.match(/\d+/);
-            if (numberInSegment && numberInSegment[0]) {
-              filename = `${numberInSegment[0]}.mp3`;
-            } else {
-              // Fallback dengan judul audio dan timestamp untuk keunikan
-              const cleanTitle = (title_audio || 'audio').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30); // Bersihkan judul
-              filename = `${cleanTitle}_${Date.now()}.mp3`;
-            }
-          }
-        }
-      } catch (e) {
-        logs('warning', `Failed to parse audio URL for filename: ${e.message}`, { AudioURL: audioUrl });
-        filename = `tiktok_audio_fallback_${Date.now()}.mp3`; // Fallback dengan timestamp jika parsing error
-      }
-
-      // Pastikan selalu berakhir dengan .mp3
-      if (!filename.endsWith('.mp3')) {
-          filename += '.mp3';
-      }
-      
-      logs('info', 'Attempting to send TikTok audio by direct download (using follow-redirects)...', { ChatID: From, AudioURL: audioUrl.slice(0, 50) + '...' });
-      logs('info', `Proposed filename: ${filename}`, { ChatID: From });
-      
-      tempFilePath = path.join(os.tmpdir(), filename); // Menggunakan direktori sementara sistem
-      logs('info', `Downloading audio to temporary file: ${tempFilePath}`, { ChatID: From, AudioURL: audioUrl.slice(0, 50) + '...' });
-      
-      try {
-        const writer = fs.createWriteStream(tempFilePath);
-        const response = await axios({
-            method: 'get',
-            url: audioUrl,
-            responseType: 'stream'
-        });
-
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
-        logs('success', `Audio downloaded to temporary file: ${tempFilePath}`, { ChatID: From });
-
-        await bot.sendAudio(From, tempFilePath, { // Mengirim dari file lokal
-          caption: `Audio: ${title_audio || 'N/A'}`,
-          filename: filename, // Tetap berikan filename eksplisit
-          reply_markup: {
-            inline_keyboard: [[{ text: '🎵 URL Audio', url: audioUrl }]]
-          }
-        });
-        logs('success', 'TikTok audio sent successfully (from local file)', { ChatID: From, SentFilename: filename }); // Log nama file yang *dikirim*
-      } catch (audioDownloadError) {
-        logs('error', `Failed to download or send TikTok audio from local file. Error: ${audioDownloadError.message}`, { ChatID: From, AudioURL: audioUrl, FullError: audioDownloadError });
-        await bot.sendMessage(From, getLocalizedMessage(userLang, 'error_sending_audio', MESSAGES), { parse_mode: 'Markdown' });
-      } finally {
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
-          logs('info', `Temporary audio file deleted: ${tempFilePath}`, { ChatID: From });
-        }
-      }
-      await sleep(3000);
-    } else {
-      logs('warning', 'No audio URL found for TikTok photos.', { ChatID: From });
-    }
-
+    await bot.sendVideo(chatId, videoUrl, {
+      caption: finalCaption,
+      reply_markup: {
+        inline_keyboard: inlineKeyboard,
+      },
+    });
   } catch (error) {
-    logs('error', 'General error in TikTok video handler', { ChatID: From, Error: error.message });
-    await bot.sendMessage(From, getLocalizedMessage(userLang, 'error_sending_video', MESSAGES), { parse_mode: 'Markdown' });
+    console.error('Error sending TikTok video:', error.message);
+    await bot.sendMessage(chatId, getLocalizedMessage(lang, 'error_sending_video', MESSAGES), { parse_mode: 'Markdown' });
   }
-}
-
-module.exports = tiktok_video;
+};
