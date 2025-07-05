@@ -1,72 +1,40 @@
 // bot/bot_core.js
 const TelegramBot = require('node-telegram-bot-api');
-const { logs } = require('../utils/common_utils'); // Utilitas logging
+const { logs } = require('../utils/common_utils');
+const { BOT_TOKEN } = require('../config/app_config');
 
-// Konfigurasi dari app_config.js
-const { BOT_TOKEN, SUPPORT_TELEGRAM_URL } = require('../config/app_config');
-
-// Mengimpor semua command handler
+// Mengimpor semua command dan event handler
 const startCommand = require('./commands/start');
 const helpCommand = require('./commands/help');
 const runtimeCommand = require('./commands/runtime');
-
-// Mengimpor semua event handler
 const messageHandler = require('./handlers/message_handler');
 const callbackQueryHandler = require('./handlers/callback_query_handler');
 
-let bot; // Deklarasi bot di luar fungsi untuk akses global
-let startTime; // Deklarasi startTime di luar fungsi
+// --- PERUBAHAN UTAMA: Bot dibuat tanpa langsung memulai polling ---
+logs('info', 'Creating Telegram bot instance...');
+// Opsi { polling: true } dihilangkan agar mode bisa dipilih nanti (di run-polling.js atau webhook.js)
+const bot = new TelegramBot(BOT_TOKEN);
+const startTime = new Date();
 
-// Fungsi untuk menginisialisasi dan memulai bot Telegram
-function startTelegramBot() {
-  logs('info', 'Initializing Telegram bot...');
-  bot = new TelegramBot(BOT_TOKEN, { polling: true });
-  startTime = new Date(); // Catat waktu mulai bot
+// Memberikan waktu mulai ke command /runtime
+runtimeCommand.setBotStartTime(startTime);
 
-  // Set waktu mulai bot di command handlers yang memerlukannya
-  runtimeCommand.setBotStartTime(startTime);
-  // callbackQueryHandler.setBotStartTime(startTime); // INI BARIS YANG MENYEBABKAN ERROR SEBELUMNYA - SUDAH DINONAKTIFKAN
+// Mengatur daftar perintah yang muncul di menu Telegram
+bot.setMyCommands([
+  { command: '/start', description: 'Mulai bot / Start the bot' },
+  { command: '/help', description: 'Panduan penggunaan / View usage guide' },
+  { command: '/runtime', description: 'Cek waktu aktif bot / Check bot uptime' },
+]);
 
-  logs('info', 'Bot started polling for updates.', { Token: BOT_TOKEN ? BOT_TOKEN.slice(0, 10) + '...' : 'Not Set' });
+// Memasang semua 'telinga' atau event listener ke bot
+bot.on('message', (msg) => messageHandler(bot, msg));
+bot.on('callback_query', (query) => callbackQueryHandler(bot, query));
+bot.onText(/^\/start$/, (msg) => startCommand(bot, msg));
+bot.onText(/^\/help$/, (msg) => helpCommand(bot, msg));
+bot.onText(/^\/runtime$/, (msg) => runtimeCommand(bot, msg));
+bot.on('polling_error', (error) => logs('error', 'Polling error occurred!', { Error: error.message }));
 
-  // Set Bot Commands yang akan muncul di menu Telegram
-  bot.setMyCommands([
-    { command: '/start', description: 'Mulai bot / Start the bot' },
-    { command: '/help', description: 'Panduan penggunaan / View usage guide' },
-    { command: '/runtime', description: 'Cek waktu aktif bot / Check bot uptime' },
-  ]);
+logs('success', 'Telegram bot instance created and listeners are attached.');
 
-  // Event Listener:
-  // 1. Pesan Teks Umum
-  bot.on('message', (msg) => messageHandler(bot, msg)); // Delegasikan ke message_handler.js
-
-  // 2. Callback Query (Tombol Inline)
-  bot.on('callback_query', (query) => callbackQueryHandler(bot, query)); // Delegasikan ke callback_query_handler.js
-
-  // 3. Perintah Khusus
-  bot.onText(/^\/start$/, (msg) => startCommand(bot, msg));
-  bot.onText(/^\/help$/, (msg) => helpCommand(bot, msg));
-  bot.onText(/^\/runtime$/, (msg) => runtimeCommand(bot, msg));
-
-  // Penanganan error polling
-  bot.on('polling_error', (error) => {
-    logs('error', 'Polling error occurred!', { Error: error.message });
-  });
-
-  logs('success', 'Telegram Bot is fully operational.');
-}
-
-// Fungsi untuk menghentikan bot (jika diperlukan)
-function stopTelegramBot() {
-  if (bot) {
-    bot.stopPolling();
-    logs('info', 'Telegram Bot polling stopped.');
-  }
-}
-
-module.exports = {
-  startTelegramBot,
-  stopTelegramBot,
-  getBotInstance: () => bot, // Mengizinkan akses ke instance bot jika diperlukan di luar
-  getStartTime: () => startTime
-};
+// Mengekspor instance bot yang sudah siap pakai untuk digunakan oleh file lain
+module.exports = bot;
