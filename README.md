@@ -36,7 +36,7 @@ Bot ini merupakan pengembangan dari proyek sumber terbuka, dengan fokus pada **m
 ## 🚀 Coba Sekarang!
 
 Anda bisa mencoba bot ini langsung di Telegram:  
-**https://t.me/iuno_tiktok_bot**  
+**[@iuno_tiktok_bot]([https://t.me/iuno_tiktok_bot](https://t.me/iunoDownloadSocmed_bot))**  
 > *(Ganti dengan tautan bot Telegram Anda setelah deploy)*
 
 ---
@@ -110,3 +110,5 @@ Bot Anda sekarang akan aktif dan siap menerima perintah Telegram serta melayani 
 ## 📄 Lisensi
 
 Proyek ini dilisensikan di bawah **MIT License**.
+
+Credit Original Repositori https://github.com/hostinger-bot/tiktok-tele-bot

@@ -65,10 +65,19 @@ const getLocalizedMessage = (lang, messageKey, configMessages) => {
   return (configMessages[lang] && configMessages[lang][messageKey]) ? configMessages[lang][messageKey] : configMessages['en'][messageKey]; // Default ke English
 };
 
+// Fungsi untuk escape karakter khusus MarkdownV2
+const escapeMarkdownV2 = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  
+  // Escape semua karakter khusus MarkdownV2
+  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+};
+
 module.exports = {
   logs,
   sleep,
   calculateRuntime,
   formatRuntimeMessage,
   getLocalizedMessage,
+  escapeMarkdownV2,
 };

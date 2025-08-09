@@ -58,6 +58,16 @@ module.exports = async (bot, msg) => {
 
   try {
     if (isTikTokUrl && text.trim() === text) {
+      // Add random emoji reaction when TikTok link is received (using only basic supported reactions)
+      const reactions = ['👍', '👎', '❤️', '🔥', '🥰', '👏', '😁', '🤔', '🤯', '😱', '🤬', '😢', '🎉', '🤩', '🤮', '💩', '🙏', '👌', '🕊', '🤡', '🥱', '🥴', '😍', '🐳', '❤️‍🔥', '🌚', '🌭', '💯', '🤣', '⚡', '🍌', '🏆', '💔', '🤨', '😐', '🍓', '🍾', '💋', '🖕', '😈', '😴', '😭', '🤓', '👻', '👨‍💻', '👀', '🎃', '🙈', '😇', '😨', '🤝', '✍️', '🤗', '🫡', '🎅', '🎄', '☃️', '💅', '🤪', '🗿', '🆒', '💘', '🙉', '🦄', '😘', '💊', '🙊', '😎', '👾', '🤷‍♂️', '🤷', '🤷‍♀️', '😡'];
+      const randomReaction = reactions[Math.floor(Math.random() * reactions.length)];
+      
+      try {
+        await bot.setMessageReaction(chatId, msg.message_id, { reaction: [{ type: 'emoji', emoji: randomReaction }] });
+      } catch (reactionError) {
+        logs('warning', 'Failed to add reaction', { ChatID: chatId, Error: reactionError.message });
+      }
+      
       const sentMessage = await bot.sendMessage(chatId, getLocalizedMessage(lang, 'processing', MESSAGES), { parse_mode: 'Markdown' });
       processingMessageId = sentMessage.message_id;
 

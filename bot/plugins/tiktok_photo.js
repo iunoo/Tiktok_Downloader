@@ -1,6 +1,9 @@
 // bot/plugins/tiktok_photo.js
-const { getLocalizedMessage } = require('../../utils/common_utils');
+const { getLocalizedMessage, escapeMarkdownV2 } = require('../../utils/common_utils');
 const { MESSAGES, SUPPORT_TELEGRAM_URL } = require('../../config/app_config');
+
+// Import URL mapping functions from tiktok_video
+const tiktokVideoPlugin = require('./tiktok_video');
 
 module.exports = async (bot, msg, data, lang) => {
   const chatId = msg.chat.id;
@@ -18,11 +21,15 @@ module.exports = async (bot, msg, data, lang) => {
   if (videoTitle.length > 400) videoTitle = videoTitle.substring(0, 400) + '...';
   if (audioTitle.length > 400) audioTitle = audioTitle.substring(0, 400) + '...';
 
-  const captionText = [`Judul : ${videoTitle}`, `Audio : ${audioTitle}`].join('\n');
+  // Escape special characters for MarkdownV2
+  const escapedVideoTitle = escapeMarkdownV2(videoTitle);
+  const escapedAudioTitle = escapeMarkdownV2(audioTitle);
+
+  const captionText = [`*Judul* : ${escapedVideoTitle}`, `*Audio* : ${escapedAudioTitle}`].join('\n');
 
   if (photoUrls.length === 1) {
     const photoUrl = photoUrls[0];
-    const successMessage = '✅ Foto berhasil diunduh!';
+    const successMessage = '✅ *Foto berhasil diunduh\\!*';
     const finalCaption = `${captionText}\n\n${successMessage}`;
     const inlineKeyboard = [];
     const row1 = [];
@@ -30,7 +37,13 @@ module.exports = async (bot, msg, data, lang) => {
     
     // --- PERUBAHAN STRATEGI CALLBACK ---
     if (audioUrl) {
-      row1.push({ text: '🎧 Download Audio', callback_data: `download_audio:${originalUrl}` });
+      // Generate short ID and store URL mapping (same as tiktok_video)
+      const shortId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+      // We'll use the same mapping system from tiktok_video
+      if (tiktokVideoPlugin.setUrlMapping) {
+        tiktokVideoPlugin.setUrlMapping(shortId, originalUrl);
+      }
+      row1.push({ text: '🎧 Download Audio', callback_data: `download_audio:${shortId}` });
     }
     // --- AKHIR PERUBAHAN ---
     
@@ -40,6 +53,7 @@ module.exports = async (bot, msg, data, lang) => {
     try {
       await bot.sendPhoto(chatId, photoUrl, {
         caption: finalCaption,
+        parse_mode: 'MarkdownV2',
         reply_markup: {
           inline_keyboard: inlineKeyboard,
         },
@@ -49,9 +63,14 @@ module.exports = async (bot, msg, data, lang) => {
       await bot.sendMessage(chatId, getLocalizedMessage(lang, 'error_sending_photo', MESSAGES), { parse_mode: 'Markdown' });
     }
   } else {
-    const successMessage = `✅ Slideshow berhasil diunduh! (${photoUrls.length} foto)`;
+    const successMessage = `✅ *Slideshow berhasil diunduh\\!* \\(${photoUrls.length} foto\\)`;
     const finalCaption = `${captionText}\n\n${successMessage}`;
-    const mediaGroup = photoUrls.map((url, index) => ({ type: 'photo', media: url, caption: index === 0 ? finalCaption : '' }));
+    const mediaGroup = photoUrls.map((url, index) => ({ 
+      type: 'photo', 
+      media: url, 
+      caption: index === 0 ? finalCaption : '',
+      parse_mode: index === 0 ? 'MarkdownV2' : undefined
+    }));
 
     try {
       await bot.sendMediaGroup(chatId, mediaGroup);
@@ -61,13 +80,20 @@ module.exports = async (bot, msg, data, lang) => {
       
       // --- PERUBAHAN STRATEGI CALLBACK ---
       if (audioUrl) {
-        row1.push({ text: '🎧 Download Audio', callback_data: `download_audio:${originalUrl}` });
+        // Generate short ID and store URL mapping (same as tiktok_video)
+        const shortId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        // We'll use the same mapping system from tiktok_video
+        if (tiktokVideoPlugin.setUrlMapping) {
+          tiktokVideoPlugin.setUrlMapping(shortId, originalUrl);
+        }
+        row1.push({ text: '🎧 Download Audio', callback_data: `download_audio:${shortId}` });
       }
       // --- AKHIR PERUBAHAN ---
 
       inlineKeyboard.push(row1);
       inlineKeyboard.push([{ text: '❤️ Support iuno.in', url: SUPPORT_TELEGRAM_URL }]);
-      await bot.sendMessage(chatId, 'Gunakan tombol di bawah untuk tautan tambahan:', {
+      await bot.sendMessage(chatId, '*Gunakan tombol di bawah untuk tautan tambahan:*', {
+        parse_mode: 'MarkdownV2',
         reply_markup: {
           inline_keyboard: inlineKeyboard,
         },

@@ -27,7 +27,16 @@ module.exports = async (bot, callbackQuery) => {
     }
 
     if (data.startsWith('download_audio:')) {
-      const tiktokUrl = data.substring('download_audio:'.length);
+      const shortId = data.substring('download_audio:'.length);
+      
+      // Import the URL mapping from tiktok_video plugin
+      const tiktokVideoPlugin = require('../plugins/tiktok_video');
+      const tiktokUrl = tiktokVideoPlugin.getUrlFromMapping ? tiktokVideoPlugin.getUrlFromMapping(shortId) : null;
+      
+      if (!tiktokUrl) {
+        await bot.sendMessage(chatId, '❌ Link sudah kadaluarsa. Silakan kirim ulang link TikTok.');
+        return;
+      }
       let processingMsg = null;
       try {
         processingMsg = await bot.sendMessage(chatId, '⏳ Memproses ulang untuk audio, mohon tunggu...');
